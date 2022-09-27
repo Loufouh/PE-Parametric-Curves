@@ -274,31 +274,6 @@ void reshape(int w, int h) {
     camera.resize(w, h);
 }
 
-unsigned int get_max(const std::vector<unsigned int> values) {
-    unsigned int max = 0;
-
-    for (auto value: values) {
-        if (value > max) {
-            max = value;
-        }
-    }
-
-    return max;
-}
-
-void normalize_valences(const std::vector<unsigned int> &valences,
-                        std::vector<float> &normalized) {
-
-    unsigned int max = get_max(valences);
-
-    normalized.clear();
-    normalized.reserve(valences.size());
-
-    for (auto valence: valences) {
-        normalized.push_back((float) valence / (float) max);
-    }
-}
-
 // ------------------------------------
 // Start of graphical application
 // ------------------------------------

@@ -85,7 +85,7 @@ void init() {
     glEnable(GL_COLOR_MATERIAL);
 }
 
-std::vector<Vec3> HermiteCubicCurve(Vec3 p0, Vec3 p1, Vec3 v0, Vec3 v1, long nbU) {
+std::vector<Vec3> HermiteCubicCurve(const Vec3 &p0, const Vec3 &p1, const Vec3 &v0, const Vec3 &v1, const long nbU) {
     std::vector<Vec3> curvePoints;
     curvePoints.reserve(nbU);
 

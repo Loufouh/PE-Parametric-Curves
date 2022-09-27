@@ -75,124 +75,69 @@ static bool fullScreen = false;
 // ------------------------------------
 // Application initialization
 // ------------------------------------
-void initLight() {
-    GLfloat light_position1[4] = {22.0f, 16.0f, 50.0f, 0.0f};
-    GLfloat direction1[3] = {-52.0f, -16.0f, -50.0f};
-    GLfloat color1[4] = {1.0f, 1.0f, 1.0f, 1.0f};
-    GLfloat ambient[4] = {0.3f, 0.3f, 0.3f, 0.5f};
-
-    glLightfv(GL_LIGHT1, GL_POSITION, light_position1);
-    glLightfv(GL_LIGHT1, GL_SPOT_DIRECTION, direction1);
-    glLightfv(GL_LIGHT1, GL_DIFFUSE, color1);
-    glLightfv(GL_LIGHT1, GL_SPECULAR, color1);
-    glLightModelfv(GL_LIGHT_MODEL_AMBIENT, ambient);
-    glEnable(GL_LIGHT1);
-    glEnable(GL_LIGHTING);
-}
-
 void init() {
     camera.resize(SCREENWIDTH, SCREENHEIGHT);
-    initLight();
     glCullFace(GL_BACK);
     glDisable(GL_CULL_FACE);
     glDepthFunc(GL_LESS);
     glEnable(GL_DEPTH_TEST);
-    glClearColor(0.2f, 0.2f, 0.3f, 1.0f);
+    glClearColor(0.2f, 0.2f, 1.0f, 1.0f);
     glEnable(GL_COLOR_MATERIAL);
-    glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, GL_TRUE);
 }
 
+std::vector<Vec3> curvePoints;
+
+void setupCurvePoints() {
+    curvePoints.clear();
+    curvePoints.reserve(100);
+
+    for(int i = 0; i < 100; i++) {
+        float x = (float) i / (float) 50 - 1;
+
+        curvePoints.push_back(
+            Vec3(
+                x,
+                x*x,
+                0
+            )
+        );
+    }
+}
+
+void update() {
+
+}
 
 // ------------------------------------
 // Rendering.
 // ------------------------------------
 
-void drawVector(Vec3 const &i_from, Vec3 const &i_to) {
+void drawCurve(const std::vector<Vec3> &points) {
+    glBegin(GL_LINE_STRIP);
 
-    glBegin(GL_LINES);
-    glVertex3f(i_from[0], i_from[1], i_from[2]);
-    glVertex3f(i_to[0], i_to[1], i_to[2]);
-    glEnd();
-}
-
-void drawAxis(Vec3 const &i_origin, Vec3 const &i_direction) {
-    glLineWidth(4); // for example...
-    drawVector(i_origin, i_origin + i_direction);
-}
-
-void drawReferenceFrame(Vec3 const &origin, Vec3 const &i, Vec3 const &j, Vec3 const &k) {
-    glDisable(GL_LIGHTING);
-    glColor3f(0.8, 0.2, 0.2);
-    drawAxis(origin, i);
-    glColor3f(0.2, 0.8, 0.2);
-    drawAxis(origin, j);
-    glColor3f(0.2, 0.2, 0.8);
-    drawAxis(origin, k);
-    glEnable(GL_LIGHTING);
-
-}
-
-void drawReferenceFrame(Basis &i_basis) {
-    drawReferenceFrame(i_basis.origin, i_basis.i, i_basis.j, i_basis.k);
-}
-
-typedef struct {
-    float r;       // ∈ [0, 1]
-    float g;       // ∈ [0, 1]
-    float b;       // ∈ [0, 1]
-} RGB;
-
-
-RGB scalarToRGB(float scalar_value) //Scalar_value ∈ [0, 1]
-{
-    RGB rgb;
-    float H = scalar_value * 360., S = 1., V = 0.85,
-            P, Q, T,
-            fract;
-
-    (H == 360.) ? (H = 0.) : (H /= 60.);
-    fract = H - floor(H);
-
-    P = V * (1. - S);
-    Q = V * (1. - S * fract);
-    T = V * (1. - S * (1. - fract));
-
-    if (0. <= H && H < 1.)
-        rgb = (RGB) {.r = V, .g = T, .b = P};
-    else if (1. <= H && H < 2.)
-        rgb = (RGB) {.r = Q, .g = V, .b = P};
-    else if (2. <= H && H < 3.)
-        rgb = (RGB) {.r = P, .g = V, .b = T};
-    else if (3. <= H && H < 4.)
-        rgb = (RGB) {.r = P, .g = Q, .b = V};
-    else if (4. <= H && H < 5.)
-        rgb = (RGB) {.r = T, .g = P, .b = V};
-    else if (5. <= H && H < 6.)
-        rgb = (RGB) {.r = V, .g = P, .b = Q};
-    else
-        rgb = (RGB) {.r = 0., .g = 0., .b = 0.};
-
-    return rgb;
-}
-
-void drawVectorField(std::vector<Vec3> const &i_positions, std::vector<Vec3> const &i_directions) {
-    glLineWidth(1.);
-    for (unsigned int pIt = 0; pIt < i_directions.size(); ++pIt) {
-        Vec3 to = i_positions[pIt] + 0.02 * i_directions[pIt];
-        drawVector(i_positions[pIt], to);
+    for (const Vec3 &point: points) {
+        glVertex3f(
+                point[0],
+                point[1],
+                point[2]
+        );
     }
+
+    glEnd();
 }
 
 //Draw fonction
 void draw() {
-    glColor3f(0.8, 1, 0.8);
-
+    glColor3f(1.0, 1.0, 1.0);
+    glLineWidth(3);
+    drawCurve(curvePoints);
 }
 
 void display() {
     glLoadIdentity();
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     camera.apply();
+    update();
     draw();
     glFlush();
     glutSwapBuffers();
@@ -284,7 +229,7 @@ int main(int argc, char **argv) {
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DEPTH | GLUT_DOUBLE);
     glutInitWindowSize(SCREENWIDTH, SCREENHEIGHT);
-    window = glutCreateWindow("TP HAI702I");
+    window = glutCreateWindow("TP | Courbes paramétriques");
 
     init();
     glutIdleFunc(idle);
@@ -294,6 +239,8 @@ int main(int argc, char **argv) {
     glutMotionFunc(motion);
     glutMouseFunc(mouse);
     key('?', 0, 0);
+
+    setupCurvePoints();
 
     glutMainLoop();
     return EXIT_SUCCESS;

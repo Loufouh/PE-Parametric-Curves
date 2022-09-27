@@ -28,201 +28,6 @@
 #include "src/Vec3.h"
 #include "src/Camera.h"
 
-enum DisplayMode {
-    WIRE = 0, SOLID = 1, LIGHTED_WIRE = 2, LIGHTED = 3
-};
-
-struct Triangle {
-    inline Triangle() {
-        v[0] = v[1] = v[2] = 0;
-    }
-
-    inline Triangle(const Triangle &t) {
-        v[0] = t.v[0];
-        v[1] = t.v[1];
-        v[2] = t.v[2];
-    }
-
-    inline Triangle(unsigned int v0, unsigned int v1, unsigned int v2) {
-        v[0] = v0;
-        v[1] = v1;
-        v[2] = v2;
-    }
-
-    unsigned int &operator[](unsigned int iv) { return v[iv]; }
-
-    unsigned int operator[](unsigned int iv) const { return v[iv]; }
-
-    inline virtual ~Triangle() {}
-
-    inline Triangle &operator=(const Triangle &t) {
-        v[0] = t.v[0];
-        v[1] = t.v[1];
-        v[2] = t.v[2];
-        return (*this);
-    }
-
-    // membres indices des sommets du triangle:
-    unsigned int v[3];
-};
-
-int weight_type = 0;
-
-struct Mesh {
-    std::vector<Vec3> vertices; //array of mesh vertices positions
-    std::vector<Vec3> normals; //array of vertices normals useful for the display
-    std::vector<Triangle> triangles; //array of mesh triangles
-    std::vector<Vec3> triangle_normals; //triangle normals to display face normals
-
-    //Compute face normals for the display
-    void computeTrianglesNormals() {
-        //A faire : implémenter le calcul des normales par face
-        //Attention commencer la fonction par triangle_normals.clear();
-        triangle_normals.clear();
-        triangle_normals.reserve(triangles.size());
-        //Iterer sur les triangles
-        for (Triangle triangle: triangles) {
-            Vec3 vertex0 = vertices[triangle[0]];
-            Vec3 vertex1 = vertices[triangle[1]];
-            Vec3 vertex2 = vertices[triangle[2]];
-
-            //L'arete e_10 est représentée par le vecteur partant du sommet 0 (triangles[i][0]) au sommet 1 (triangles[i][1])
-            Vec3 vector1 = vertex1 - vertex0;
-            //L'arete e_20 est représentée par le vecteur partant du sommet 0 (triangles[i][0]) au sommet 2 (triangles[i][2])
-            Vec3 vector2 = vertex2 - vertex0;
-
-            //La normal du triangle i est le resultat du produit vectoriel de deux ses arêtes e_10 et e_20 normalisé (e_10^e_20)
-            Vec3 normal = Vec3::cross(vector1, vector2);
-
-            //Normaliser et ajouter dans triangle_normales
-            normal.normalize();
-            triangle_normals.push_back(normal);
-        }
-
-    }
-
-    void resetNormals() {
-        normals.clear();
-        normals.resize(vertices.size());
-
-        for (Vec3 &normal: normals) {
-            normal = Vec3(0, 0, 0);
-        }
-    }
-
-    void normalizeNormals() {
-        for (Vec3 &normal: normals) {
-            normal.normalize();
-        }
-    }
-
-    void computeUniformVerticesNormals() {
-        resetNormals();
-
-        for (unsigned int i = 0; i < triangles.size(); i++) {
-            for (int j = 0; j < 3; j++) {
-                normals[triangles[i][j]] += triangle_normals[i];
-            }
-        }
-
-        normalizeNormals();
-    }
-
-    void computeAreaVerticesNormals() {
-        resetNormals();
-
-        for (unsigned int i = 0; i < triangles.size(); i++) {
-            Vec3 vertex0 = vertices[triangles[i][0]];
-            Vec3 vertex1 = vertices[triangles[i][1]];
-            Vec3 vertex2 = vertices[triangles[i][2]];
-
-            //L'arete e_10 est représentée par le vecteur partant du sommet 0 (triangles[i][0]) au sommet 1 (triangles[i][1])
-            Vec3 vector1 = vertex1 - vertex0;
-            //L'arete e_20 est représentée par le vecteur partant du sommet 0 (triangles[i][0]) au sommet 2 (triangles[i][2])
-            Vec3 vector2 = vertex2 - vertex0;
-
-            //Calcul de l'air du triangle
-            //(En fait, ici on calcule celle du parallélogramme, mais comme ça sera normé, ça n'a pas d'importance)
-            float area = vector1.length() * vector2.length();
-
-            //Pondération de la normal du triangle
-            Vec3 weightedNormal = triangle_normals[i];
-            weightedNormal *= area;
-
-            //Ajout de la normal du triangle pour chaque sommet
-            for (int j = 0; j < 3; j++) {
-                normals[triangles[i][j]] += weightedNormal;
-            }
-        }
-
-        normalizeNormals();
-    }
-
-    void computeAngleVerticesNormals() {
-        resetNormals();
-
-        for (unsigned int i = 0; i < triangles.size(); i++) {
-            //Pour chaque sommet du triangle
-            for (int j = 0; j < 3; j++) {
-                Vec3 vertex0 = vertices[triangles[i][j % 3]];
-                Vec3 vertex1 = vertices[triangles[i][(j + 1) % 3]];
-                Vec3 vertex2 = vertices[triangles[i][(j + 2) % 3]];
-
-                //L'arete e_10 est représentée par le vecteur partant du sommet 0 (triangles[i][0]) au sommet 1 (triangles[i][1])
-                Vec3 vector1 = vertex1 - vertex0;
-                //L'arete e_20 est représentée par le vecteur partant du sommet 0 (triangles[i][0]) au sommet 2 (triangles[i][2])
-                Vec3 vector2 = vertex2 - vertex0;
-
-                //Calcul de l'angle depuis le produit scalaire : a.b = cos(angle)/( ||a|| * ||b|| )
-                // => angle = acos(a.b / ( ||a|| * ||b|| ))
-                float dotProduct = Vec3::dot(vector1, vector2);
-                float lengthMultiplication = vector1.length() * vector2.length();
-
-                float angle = acos( dotProduct / lengthMultiplication );
-
-                //Pondération de la normale du triangle
-                Vec3 weightedNormal = triangle_normals[i];
-                weightedNormal *= angle;
-
-                //Ajout de la normale du triangle pour le sommet
-                normals[triangles[i][j]] += weightedNormal;
-            }
-        }
-
-        normalizeNormals();
-    }
-
-    //Compute vertices normals as the average of its incident faces normals
-    void computeVerticesNormals() {
-        //Utiliser weight_type : 0 uniforme, 1 aire des triangles, 2 angle du triangle
-
-        switch (weight_type) {
-            case 0:
-                computeUniformVerticesNormals();
-                break;
-            case 1:
-                computeAreaVerticesNormals();
-                break;
-            case 2:
-                computeAngleVerticesNormals();
-                break;
-
-            default:
-                break;
-        }
-    }
-
-    void computeNormals() {
-        computeTrianglesNormals();
-        computeVerticesNormals();
-    }
-};
-
-//Transformation made of a rotation and translation
-struct Transformation {
-    Mat3 rotation;
-    Vec3 translation;
-};
 
 //Basis ( origin, i, j ,k )
 struct Basis {
@@ -252,78 +57,6 @@ struct Basis {
     Vec3 k;
 };
 
-//Fonction à completer
-void collect_one_ring(std::vector<Vec3> const &i_vertices,
-                      std::vector<Triangle> const &i_triangles,
-                      std::vector<std::vector<unsigned int> > &o_one_ring) {//one-ring of each vertex, i.e. a list of vertices with which it shares an edge
-    //Initialiser le vecetur de o_one_ring de la taille du vecteur vertices
-    o_one_ring.resize(i_vertices.size());
-
-    for (int i = 0; i < i_vertices.size(); i++) {
-        o_one_ring[i] = std::vector<unsigned int>();
-    }
-
-    //Parcourir les triangles et ajouter les voisins dans le 1-voisinage
-    for (auto triangle: i_triangles) {
-        //Pour chaque sommet du triangle
-        for (int i = 0; i < 3; i++) {
-            unsigned int currentVertex = triangle[i];
-            std::vector<unsigned int> &currentVertexVector = o_one_ring[currentVertex];
-
-            //Pour chaque autre sommet du triangle
-            for (int j = 1; j <= 2; j++) {
-                unsigned int secondaryVertex = triangle[(i + j) % 3];
-
-                std::vector<unsigned int>::iterator it;
-
-                it = std::find(
-                        currentVertexVector.begin(),
-                        currentVertexVector.end(),
-                        secondaryVertex
-                );
-
-                bool isAlreadyInserted = it != currentVertexVector.end();
-
-                //L'inserer s'il n'est pas deja present
-                if (!isAlreadyInserted) {
-                    currentVertexVector.push_back(secondaryVertex);
-                }
-            }
-        }
-    }
-}
-
-//Fonction à completer
-void compute_vertex_valences(const std::vector<Vec3> &i_vertices,
-                             const std::vector<Triangle> &i_triangles,
-                             std::vector<unsigned int> &o_valences) {
-    //Utiliser la fonction collect_one_ring pour récuperer le 1-voisinage
-    std::vector<std::vector<unsigned int> > one_ring;
-    collect_one_ring(
-            i_vertices,
-            i_triangles,
-            one_ring
-    );
-
-    o_valences.resize(i_vertices.size());
-
-    //Pour chaque sommet, preciser la valence
-    for (unsigned int i = 0; i < one_ring.size(); i++) {
-        o_valences[i] = one_ring[i].size();
-    }
-}
-
-//Input mesh loaded at the launch of the application
-Mesh mesh;
-std::vector<float> mesh_valence_field; //normalized valence of each vertex
-
-Basis basis;
-
-bool display_normals;
-bool display_smooth_normals;
-bool display_mesh;
-bool display_basis;
-DisplayMode displayMode;
 
 // -------------------------------------------
 // OpenGL/GLUT application code.
@@ -338,121 +71,6 @@ static bool mouseMovePressed = false;
 static bool mouseZoomPressed = false;
 static int lastX = 0, lastY = 0, lastZoom = 0;
 static bool fullScreen = false;
-
-// ------------------------------------
-// File I/O
-// ------------------------------------
-bool saveOFF(const std::string &filename,
-             std::vector<Vec3> const &i_vertices,
-             std::vector<Vec3> const &i_normals,
-             std::vector<Triangle> const &i_triangles,
-             std::vector<Vec3> const &i_triangle_normals,
-             bool save_normals = true) {
-    std::ofstream myfile;
-    myfile.open(filename.c_str());
-    if (!myfile.is_open()) {
-        std::cout << filename << " cannot be opened" << std::endl;
-        return false;
-    }
-
-    myfile << "OFF" << std::endl;
-
-    unsigned int n_vertices = i_vertices.size(), n_triangles = i_triangles.size();
-    myfile << n_vertices << " " << n_triangles << " 0" << std::endl;
-
-    for (unsigned int v = 0; v < n_vertices; ++v) {
-        myfile << i_vertices[v][0] << " " << i_vertices[v][1] << " " << i_vertices[v][2] << " ";
-        if (save_normals) myfile << i_normals[v][0] << " " << i_normals[v][1] << " " << i_normals[v][2] << std::endl;
-        else myfile << std::endl;
-    }
-    for (unsigned int f = 0; f < n_triangles; ++f) {
-        myfile << 3 << " " << i_triangles[f][0] << " " << i_triangles[f][1] << " " << i_triangles[f][2] << " ";
-        if (save_normals)
-            myfile << i_triangle_normals[f][0] << " " << i_triangle_normals[f][1] << " " << i_triangle_normals[f][2];
-        myfile << std::endl;
-    }
-    myfile.close();
-    return true;
-}
-
-void openOFF(std::string const &filename,
-             std::vector<Vec3> &o_vertices,
-             std::vector<Vec3> &o_normals,
-             std::vector<Triangle> &o_triangles,
-             std::vector<Vec3> &o_triangle_normals,
-             bool load_normals = true) {
-    std::ifstream myfile;
-    myfile.open(filename.c_str());
-    if (!myfile.is_open()) {
-        std::cout << filename << " cannot be opened" << std::endl;
-        return;
-    }
-
-    std::string magic_s;
-
-    myfile >> magic_s;
-
-    if (magic_s != "OFF") {
-        std::cout << magic_s << " != OFF :   We handle ONLY *.off files." << std::endl;
-        myfile.close();
-        exit(1);
-    }
-
-    int n_vertices, n_faces, dummy_int;
-    myfile >> n_vertices >> n_faces >> dummy_int;
-
-    o_vertices.clear();
-    o_normals.clear();
-
-    for (int v = 0; v < n_vertices; ++v) {
-        float x, y, z;
-
-        myfile >> x >> y >> z;
-        o_vertices.push_back(Vec3(x, y, z));
-
-        if (load_normals) {
-            myfile >> x >> y >> z;
-            o_normals.push_back(Vec3(x, y, z));
-        }
-    }
-
-    o_triangles.clear();
-    o_triangle_normals.clear();
-    for (int f = 0; f < n_faces; ++f) {
-        int n_vertices_on_face;
-        myfile >> n_vertices_on_face;
-
-        if (n_vertices_on_face == 3) {
-            unsigned int _v1, _v2, _v3;
-            myfile >> _v1 >> _v2 >> _v3;
-
-            o_triangles.push_back(Triangle(_v1, _v2, _v3));
-
-            if (load_normals) {
-                float x, y, z;
-                myfile >> x >> y >> z;
-                o_triangle_normals.push_back(Vec3(x, y, z));
-            }
-        } else if (n_vertices_on_face == 4) {
-            unsigned int _v1, _v2, _v3, _v4;
-            myfile >> _v1 >> _v2 >> _v3 >> _v4;
-
-            o_triangles.push_back(Triangle(_v1, _v2, _v3));
-            o_triangles.push_back(Triangle(_v1, _v3, _v4));
-            if (load_normals) {
-                float x, y, z;
-                myfile >> x >> y >> z;
-                o_triangle_normals.push_back(Vec3(x, y, z));
-            }
-
-        } else {
-            std::cout << "We handle ONLY *.off files with 3 or 4 vertices per face" << std::endl;
-            myfile.close();
-            exit(1);
-        }
-    }
-
-}
 
 // ------------------------------------
 // Application initialization
@@ -482,12 +100,6 @@ void init() {
     glClearColor(0.2f, 0.2f, 0.3f, 1.0f);
     glEnable(GL_COLOR_MATERIAL);
     glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, GL_TRUE);
-
-    display_normals = false;
-    display_mesh = true;
-    display_smooth_normals = true;
-    displayMode = LIGHTED;
-    display_basis = false;
 }
 
 
@@ -504,13 +116,11 @@ void drawVector(Vec3 const &i_from, Vec3 const &i_to) {
 }
 
 void drawAxis(Vec3 const &i_origin, Vec3 const &i_direction) {
-
     glLineWidth(4); // for example...
     drawVector(i_origin, i_origin + i_direction);
 }
 
 void drawReferenceFrame(Vec3 const &origin, Vec3 const &i, Vec3 const &j, Vec3 const &k) {
-
     glDisable(GL_LIGHTING);
     glColor3f(0.8, 0.2, 0.2);
     drawAxis(origin, i);
@@ -565,52 +175,6 @@ RGB scalarToRGB(float scalar_value) //Scalar_value ∈ [0, 1]
     return rgb;
 }
 
-void drawSmoothTriangleMesh(Mesh const &i_mesh, bool draw_field = false) {
-    glBegin(GL_TRIANGLES);
-    for (unsigned int tIt = 0; tIt < i_mesh.triangles.size(); ++tIt) {
-
-        for (unsigned int i = 0; i < 3; i++) {
-            const Vec3 &p = i_mesh.vertices[i_mesh.triangles[tIt][i]]; //Vertex position
-            const Vec3 &n = i_mesh.normals[i_mesh.triangles[tIt][i]]; //Vertex normal
-
-            if (draw_field && !mesh_valence_field.empty()) {
-                RGB color = scalarToRGB(mesh_valence_field[i_mesh.triangles[tIt][i]]);
-                glColor3f(color.r, color.g, color.b);
-            }
-            glNormal3f(n[0], n[1], n[2]);
-            glVertex3f(p[0], p[1], p[2]);
-        }
-    }
-    glEnd();
-
-}
-
-void drawTriangleMesh(Mesh const &i_mesh, bool draw_field = false) {
-    glBegin(GL_TRIANGLES);
-    for (unsigned int tIt = 0; tIt < i_mesh.triangles.size(); ++tIt) {
-        const Vec3 &n = i_mesh.triangle_normals[tIt]; //Triangle normal
-        for (unsigned int i = 0; i < 3; i++) {
-            const Vec3 &p = i_mesh.vertices[i_mesh.triangles[tIt][i]]; //Vertex position
-
-            if (draw_field) {
-                RGB color = scalarToRGB(mesh_valence_field[i_mesh.triangles[tIt][i]]);
-                glColor3f(color.r, color.g, color.b);
-            }
-            glNormal3f(n[0], n[1], n[2]);
-            glVertex3f(p[0], p[1], p[2]);
-        }
-    }
-    glEnd();
-
-}
-
-void drawMesh(Mesh const &i_mesh, bool draw_field = false) {
-    if (display_smooth_normals)
-        drawSmoothTriangleMesh(i_mesh, draw_field); //Smooth display with vertices normals
-    else
-        drawTriangleMesh(i_mesh, draw_field); //Display with face normals
-}
-
 void drawVectorField(std::vector<Vec3> const &i_positions, std::vector<Vec3> const &i_directions) {
     glLineWidth(1.);
     for (unsigned int pIt = 0; pIt < i_directions.size(); ++pIt) {
@@ -619,84 +183,10 @@ void drawVectorField(std::vector<Vec3> const &i_positions, std::vector<Vec3> con
     }
 }
 
-void drawNormals(Mesh const &i_mesh) {
-
-    if (display_smooth_normals) {
-        drawVectorField(i_mesh.vertices, i_mesh.normals);
-    } else {
-        std::vector<Vec3> triangle_baricenters;
-        for (const Triangle &triangle: i_mesh.triangles) {
-            Vec3 triangle_baricenter(0., 0., 0.);
-            for (unsigned int i = 0; i < 3; i++)
-                triangle_baricenter += i_mesh.vertices[triangle[i]];
-            triangle_baricenter /= 3.;
-            triangle_baricenters.push_back(triangle_baricenter);
-        }
-
-        drawVectorField(triangle_baricenters, i_mesh.triangle_normals);
-    }
-}
-
 //Draw fonction
 void draw() {
-
-
-    if (displayMode == LIGHTED || displayMode == LIGHTED_WIRE) {
-
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        glEnable(GL_LIGHTING);
-
-    } else if (displayMode == WIRE) {
-
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        glDisable(GL_LIGHTING);
-
-    } else if (displayMode == SOLID) {
-        glDisable(GL_LIGHTING);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-
-    }
-
     glColor3f(0.8, 1, 0.8);
-    drawMesh(mesh, true);
 
-    if (displayMode == SOLID || displayMode == LIGHTED_WIRE) {
-        glEnable(GL_POLYGON_OFFSET_LINE);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        glLineWidth(1.0f);
-        glPolygonOffset(-2.0, 1.0);
-
-        glColor3f(0., 0., 0.);
-        drawMesh(mesh, false);
-
-        glDisable(GL_POLYGON_OFFSET_LINE);
-        glEnable(GL_LIGHTING);
-    }
-
-
-    glDisable(GL_LIGHTING);
-    if (display_normals) {
-        glColor3f(1., 0., 0.);
-        drawNormals(mesh);
-    }
-
-    if (display_basis) {
-        drawReferenceFrame(basis);
-    }
-    glEnable(GL_LIGHTING);
-
-
-}
-
-void changeDisplayMode() {
-    if (displayMode == LIGHTED)
-        displayMode = LIGHTED_WIRE;
-    else if (displayMode == LIGHTED_WIRE)
-        displayMode = SOLID;
-    else if (displayMode == SOLID)
-        displayMode = WIRE;
-    else
-        displayMode = LIGHTED;
 }
 
 void display() {
@@ -719,41 +209,13 @@ void idle() {
 void key(unsigned char keyPressed, int x, int y) {
     switch (keyPressed) {
         case 'f':
-            if (fullScreen == true) {
+            if (fullScreen) {
                 glutReshapeWindow(SCREENWIDTH, SCREENHEIGHT);
                 fullScreen = false;
             } else {
                 glutFullScreen();
                 fullScreen = true;
             }
-            break;
-
-
-        case 'w': //Change le mode d'affichage
-            changeDisplayMode();
-            break;
-
-
-        case 'b': //Toggle basis display
-            display_basis = !display_basis;
-            break;
-
-        case 'n': //Press n key to display normals
-            display_normals = !display_normals;
-            break;
-
-        case '1': //Toggle loaded mesh display
-            display_mesh = !display_mesh;
-            break;
-
-        case 's': //Switches between face normals and vertices normals
-            display_smooth_normals = !display_smooth_normals;
-            break;
-
-        case '+': //Changes weight type: 0 uniforme, 1 aire des triangles, 2 angle du triangle
-            weight_type++;
-            if (weight_type == 3) weight_type = 0;
-            mesh.computeVerticesNormals(); //recalcul des normales avec le type de poids choisi
             break;
 
         default:
@@ -857,32 +319,6 @@ int main(int argc, char **argv) {
     glutMotionFunc(motion);
     glutMouseFunc(mouse);
     key('?', 0, 0);
-
-    //Mesh loaded with precomputed normals
-    openOFF("../data/elephant_n.off", mesh.vertices, mesh.normals, mesh.triangles, mesh.triangle_normals);
-
-    //Completer les fonction de calcul de normals
-    mesh.computeNormals();
-
-    basis = Basis();
-
-    // A faire : completer la fonction compute_vertex_valences pour calculer les valences
-    //***********************************************//
-    std::vector<unsigned int> valences;
-    // TODO : Question 1 le calcul des valence pour chaques sommets (vertices) remplir le vector valences
-    //          Le nombre de sommets voisin au sommet donné ( partage une arête )
-    //          TODO : collect_one_ring() [ Permet de collecter le 1-voisinage ]
-
-    // A faire : normaliser les valences pour avoir une valeur flotante entre 0. et 1. dans mesh_valence_field
-    //***********************************************//
-    // Utile pour la question 2 permettant d'afficher une couleur dépendant de la valence des sommets
-    compute_vertex_valences(
-            mesh.vertices,
-            mesh.triangles,
-            valences
-    );
-
-    normalize_valences(valences, mesh_valence_field);
 
     glutMainLoop();
     return EXIT_SUCCESS;

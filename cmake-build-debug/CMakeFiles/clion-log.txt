@@ -1,0 +1,10 @@
+"/Users/louismasson/Library/Application Support/JetBrains/Toolbox/apps/CLion/ch-0/222.4167.35/CLion.app/Contents/bin/cmake/mac/bin/cmake" -DCMAKE_BUILD_TYPE=Debug "-DCMAKE_MAKE_PROGRAM=/Users/louismasson/Library/Application Support/JetBrains/Toolbox/apps/CLion/ch-0/222.4167.35/CLion.app/Contents/bin/ninja/mac/ninja" -G Ninja -S /Users/louismasson/CLionProjects/Modelisation3D_TP3 -B /Users/louismasson/CLionProjects/Modelisation3D_TP3/cmake-build-debug
+-- Found OpenGL: /Library/Developer/CommandLineTools/SDKs/MacOSX12.3.sdk/System/Library/Frameworks/OpenGL.framework   
+-- Found PkgConfig: /opt/homebrew/bin/pkg-config (found version "0.29.2") 
+-- Checking for module 'glut'
+--   Found glut, version 3.2.2
+-- Found GLUT: TRUE  
+-- Found GSL: /opt/homebrew/Cellar/gsl/2.7.1/include (found version "2.7.1") 
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /Users/louismasson/CLionProjects/Modelisation3D_TP3/cmake-build-debug

@@ -22,6 +22,9 @@
 #include <cstdio>
 #include <cstdlib>
 
+#define _USE_MATH_DEFINES
+#include <cmath>
+
 #include <algorithm>
 #include <GL/glut.h>
 #include <float.h>
@@ -85,146 +88,22 @@ void init() {
     glEnable(GL_COLOR_MATERIAL);
 }
 
-std::vector<Vec3> HermiteCubicCurve(const Vec3 &p0, const Vec3 &p1, const Vec3 &v0, const Vec3 &v1, const long nbU) {
-    std::vector<Vec3> curvePoints;
-    curvePoints.reserve(nbU);
-
-    for (int i = 0; i < nbU; i++) {
-        float u = (float) i / (float) nbU;
-
-        float f1 = 2 * u * u * u - 3 * u * u + 1;
-        float f2 = -2 * u * u * u + 3 * u * u;
-        float f3 = u * u * u - 2 * u * u + u;
-        float f4 = (u * u * u - u * u);
-
-        Vec3 point;
-
-        for (int j = 0; j < 3; j++) {
-            point[j] = f1 * p0[j] + f2 * p1[j] + f3 * v0[j] + f4 * v1[j];
-        }
-
-        curvePoints.push_back(point);
-    }
-
-    return curvePoints;
-}
-
-unsigned long factorial(unsigned long n) {
-    unsigned long result = 1;
-
-    while (n > 1) {
-        result *= n;
-        n--;
-    }
-
-    return result;
-}
-
-unsigned long binomial(unsigned long n, unsigned long k) {
-    return factorial(n) / (factorial(k) * factorial(n - k));
-}
-
-float BernsteinPoly(unsigned long n, unsigned long i, float u) {
-    return binomial(n, i) * pow(u, i) * pow(1 - u, n - i);
-}
-
-Vec3 BezierPointByBernstein(const std::vector<Vec3> &controlPoints, const float u) {
-    Vec3 point = Vec3(0, 0, 0);
-
-    for (int i = 0; i < controlPoints.size(); i++) {
-        float B = BernsteinPoly(controlPoints.size() - 1, i, u);
-
-        Vec3 addedPoint = controlPoints[i];
-        addedPoint *= B;
-
-        point += addedPoint;
-    }
-
-    return point;
-}
-
-std::vector<Vec3> BezierCurveByBernstein(const std::vector<Vec3> &controlPoints, const long nbU) {
-    std::vector<Vec3> curvePoints;
-    curvePoints.reserve(nbU);
-
-    for (int i = 0; i < nbU; i++) {
-        float u = (float) i / (float) nbU;
-
-        curvePoints.push_back(
-                BezierPointByBernstein(controlPoints, u)
-        );
-    }
-
-    return curvePoints;
-}
-
-Vec3 BezierPointByCasteljau(const std::vector<Vec3> &controlPoints, const float u) {
-    std::vector<Vec3> subControlPoints;
-    std::vector<Vec3> nextSubControlPoints = controlPoints;;
-
-    while (nextSubControlPoints.size() > 1) {
-        subControlPoints = nextSubControlPoints;
-        nextSubControlPoints.clear();
-
-        for (int i = 0; i < subControlPoints.size() - 1; i++) {
-            Vec3 point;
-            Vec3 v = subControlPoints[i + 1] - subControlPoints[i];
-            v *= u;
-
-            point = subControlPoints[i] + v;
-
-            nextSubControlPoints.push_back(point);
-        }
-    }
-
-    return nextSubControlPoints[0];
-}
-
-std::vector<Vec3> BezierCurveByCastelJau(const std::vector<Vec3> &controlPoints, const long nbU) {
-    std::vector<Vec3> curvePoints;
-
-    for (int i = 0; i < nbU; i++) {
-        float u = (float) i / (float) nbU;
-
-        curvePoints.push_back(
-                BezierPointByCasteljau(controlPoints, u)
-        );
-    }
-
-    return curvePoints;
-}
 
 std::vector<Vec3> controlPoints;
 std::vector<std::vector<Vec3> > constructionPoints;
 std::vector<Vec3> curvePoints;
 
 void setupControlPoints() {
-    /*
     controlPoints = {
             Vec3(-1, 0, 0),
             Vec3(-.25, 1, 0),
-            Vec3(.25, -1, 0),
+            Vec3(0, -1, 0),
+            Vec3(.25, 1, 0),
             Vec3(1, 0, 0)
     };
-     */
-
-    int n = 6;
-    for (int i = 0; i < n; i++) {
-        float u = (float) i / (float) (n / 2) - 1;
-
-        controlPoints.push_back(
-                Vec3(
-                        u,
-                        sin(5*u),
-                        0
-                )
-        );
-    }
 }
 
-void setupMiddleConstructionPoints() {
-    float u = .5;
-
+void setupConstructionPointsFor(float u) {
     std::vector<Vec3> subControlPoints;
     std::vector<Vec3> nextSubControlPoints = controlPoints;
 
@@ -246,9 +125,12 @@ void setupMiddleConstructionPoints() {
     }
 }
 
+#include "Hermite/hermite.h"
+#include "Berstein/berstein.h"
+#include "Casteljau/casteljau.h"
+
 void setupCurvePoints() {
-    //curvePoints = BezierCurveByBernstein(controlPoints, 100);
-    curvePoints = BezierCurveByCastelJau(controlPoints, 100);
+    curvePoints = BezierCurveByCasteljau(controlPoints, 100);
 }
 
 void update() {
@@ -273,21 +155,48 @@ void drawCurve(const std::vector<Vec3> &points) {
     glEnd();
 }
 
-//Draw fonction
+void drawCircle(const Vec3 &center, float radius) {
+    glBegin(GL_POLYGON);
+
+    for(int i = 0; i < 10; i++) {
+        float angle = 2*M_PI*(float) i / (float)10;
+
+        glVertex3f(
+                center[0] + radius*cos(angle),
+                center[1] + radius*sin(angle),
+                center[2]
+        );
+    }
+
+    glEnd();
+}
+
+void drawConstructionLines() {
+    for (int i = 0; i < constructionPoints.size(); i++) {
+
+        glColor3f(
+            -.8*(float) (1 + i) / (float) constructionPoints.size() + 1,
+            .8*(float) (1 + i) / (float) constructionPoints.size() + .2,
+            .2
+        );
+
+       drawCurve(constructionPoints[i]);
+    }
+}
+
+void drawControlPoints() {
+    glColor3f(1.0, .2, .2);
+    for(Vec3 &point : controlPoints) {
+        drawCircle(point, .025);
+    }
+}
+
+//Draw function
 void draw() {
     glLineWidth(3);
 
-    glColor3f(0, 0, 0);
-
-    for (int i = 0; i < constructionPoints.size(); i++) {
-        glColor3f(
-                .8 - (float) i / (float) constructionPoints.size(),
-                (float) i / (float) constructionPoints.size(),
-                0
-        );
-
-        drawCurve(constructionPoints[i]);
-    }
+    drawConstructionLines();
+    drawControlPoints();
 
     glColor3f(1.0, .2, .2);
     drawCurve(controlPoints);
@@ -405,7 +314,7 @@ int main(int argc, char **argv) {
     key('?', 0, 0);
 
     setupControlPoints();
-    setupMiddleConstructionPoints();
+    setupConstructionPointsFor(.90);
     setupCurvePoints();
 
     glutMainLoop();

@@ -23,9 +23,14 @@ include_directories(
 add_executable(
         tp
         tp.cpp
+
         src/Camera.cpp src/Camera.h
         src/Trackball.cpp   src/Trackball.h
         src/Vec3.h
+
+        Hermite/hermite.cpp Hermite/hermite.h
+        Berstein/berstein.cpp Berstein/berstein.h
+        Casteljau/casteljau.cpp Casteljau/casteljau.h
 )
 target_link_libraries(
         tp

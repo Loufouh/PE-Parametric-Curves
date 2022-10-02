@@ -89,18 +89,18 @@ std::vector<Vec3> HermiteCubicCurve(const Vec3 &p0, const Vec3 &p1, const Vec3 &
     std::vector<Vec3> curvePoints;
     curvePoints.reserve(nbU);
 
-    for(int i = 0; i < nbU; i++) {
+    for (int i = 0; i < nbU; i++) {
         float u = (float) i / (float) nbU;
 
-        float f1 = 2*u*u*u - 3*u*u + 1;
-        float f2 = -2*u*u*u + 3*u*u;
-        float f3 = u*u*u - 2*u*u + u;
-        float f4 = (u*u*u - u*u);
+        float f1 = 2 * u * u * u - 3 * u * u + 1;
+        float f2 = -2 * u * u * u + 3 * u * u;
+        float f3 = u * u * u - 2 * u * u + u;
+        float f4 = (u * u * u - u * u);
 
         Vec3 point;
 
-        for(int j = 0; j < 3; j++) {
-            point[j] =  f1*p0[j] + f2*p1[j] + f3*v0[j] + f4*v1[j];
+        for (int j = 0; j < 3; j++) {
+            point[j] = f1 * p0[j] + f2 * p1[j] + f3 * v0[j] + f4 * v1[j];
         }
 
         curvePoints.push_back(point);
@@ -109,16 +109,146 @@ std::vector<Vec3> HermiteCubicCurve(const Vec3 &p0, const Vec3 &p1, const Vec3 &
     return curvePoints;
 }
 
+unsigned long factorial(unsigned long n) {
+    unsigned long result = 1;
+
+    while (n > 1) {
+        result *= n;
+        n--;
+    }
+
+    return result;
+}
+
+unsigned long binomial(unsigned long n, unsigned long k) {
+    return factorial(n) / (factorial(k) * factorial(n - k));
+}
+
+float BernsteinPoly(unsigned long n, unsigned long i, float u) {
+    return binomial(n, i) * pow(u, i) * pow(1 - u, n - i);
+}
+
+Vec3 BezierPointByBernstein(const std::vector<Vec3> &controlPoints, const float u) {
+    Vec3 point = Vec3(0, 0, 0);
+
+    for (int i = 0; i < controlPoints.size(); i++) {
+        float B = BernsteinPoly(controlPoints.size() - 1, i, u);
+
+        Vec3 addedPoint = controlPoints[i];
+        addedPoint *= B;
+
+        point += addedPoint;
+    }
+
+    return point;
+}
+
+std::vector<Vec3> BezierCurveByBernstein(const std::vector<Vec3> &controlPoints, const long nbU) {
+    std::vector<Vec3> curvePoints;
+    curvePoints.reserve(nbU);
+
+    for (int i = 0; i < nbU; i++) {
+        float u = (float) i / (float) nbU;
+
+        curvePoints.push_back(
+                BezierPointByBernstein(controlPoints, u)
+        );
+    }
+
+    return curvePoints;
+}
+
+Vec3 BezierPointByCasteljau(const std::vector<Vec3> &controlPoints, const float u) {
+    std::vector<Vec3> subControlPoints;
+    std::vector<Vec3> nextSubControlPoints = controlPoints;;
+
+    while (nextSubControlPoints.size() > 1) {
+        subControlPoints = nextSubControlPoints;
+        nextSubControlPoints.clear();
+
+        for (int i = 0; i < subControlPoints.size() - 1; i++) {
+            Vec3 point;
+            Vec3 v = subControlPoints[i + 1] - subControlPoints[i];
+            v *= u;
+
+            point = subControlPoints[i] + v;
+
+            nextSubControlPoints.push_back(point);
+        }
+    }
+
+    return nextSubControlPoints[0];
+}
+
+std::vector<Vec3> BezierCurveByCastelJau(const std::vector<Vec3> &controlPoints, const long nbU) {
+    std::vector<Vec3> curvePoints;
+
+    for (int i = 0; i < nbU; i++) {
+        float u = (float) i / (float) nbU;
+
+        curvePoints.push_back(
+                BezierPointByCasteljau(controlPoints, u)
+        );
+    }
+
+    return curvePoints;
+}
+
+std::vector<Vec3> controlPoints;
+std::vector<std::vector<Vec3> > constructionPoints;
 std::vector<Vec3> curvePoints;
 
+void setupControlPoints() {
+    /*
+    controlPoints = {
+            Vec3(-1, 0, 0),
+            Vec3(-.25, 1, 0),
+            Vec3(.25, -1, 0),
+            Vec3(1, 0, 0)
+    };
+     */
+
+    int n = 6;
+    for (int i = 0; i < n; i++) {
+        float u = (float) i / (float) (n / 2) - 1;
+
+        controlPoints.push_back(
+                Vec3(
+                        u,
+                        sin(5*u),
+                        0
+                )
+        );
+    }
+}
+
+void setupMiddleConstructionPoints() {
+    float u = .5;
+
+    std::vector<Vec3> subControlPoints;
+    std::vector<Vec3> nextSubControlPoints = controlPoints;
+
+    while (nextSubControlPoints.size() > 1) {
+        subControlPoints = nextSubControlPoints;
+        nextSubControlPoints.clear();
+
+        for (int i = 0; i < subControlPoints.size() - 1; i++) {
+            Vec3 point;
+            Vec3 v = subControlPoints[i + 1] - subControlPoints[i];
+            v *= u;
+
+            point = subControlPoints[i] + v;
+
+            nextSubControlPoints.push_back(point);
+        }
+
+        constructionPoints.push_back(nextSubControlPoints);
+    }
+}
+
 void setupCurvePoints() {
-    curvePoints = HermiteCubicCurve(
-        Vec3(0, 0, 0),
-        Vec3(2, 0, 0),
-        Vec3(1, 1, 0),
-        Vec3(1, -1, 0),
-        100
-    );
+    //curvePoints = BezierCurveByBernstein(controlPoints, 100);
+    curvePoints = BezierCurveByCastelJau(controlPoints, 100);
 }
 
 void update() {
@@ -145,8 +275,24 @@ void drawCurve(const std::vector<Vec3> &points) {
 
 //Draw fonction
 void draw() {
-    glColor3f(1.0, 1.0, 1.0);
     glLineWidth(3);
+
+    glColor3f(0, 0, 0);
+
+    for (int i = 0; i < constructionPoints.size(); i++) {
+        glColor3f(
+                .8 - (float) i / (float) constructionPoints.size(),
+                (float) i / (float) constructionPoints.size(),
+                0
+        );
+
+        drawCurve(constructionPoints[i]);
+    }
+
+    glColor3f(1.0, .2, .2);
+    drawCurve(controlPoints);
+
+    glColor3f(1.0, 1.0, 1.0);
     drawCurve(curvePoints);
 }
 
@@ -222,7 +368,8 @@ void motion(int x, int y) {
     if (mouseRotatePressed == true) {
         camera.rotate(x, y);
     } else if (mouseMovePressed == true) {
-        camera.move((x - lastX) / static_cast<float>(SCREENWIDTH), (lastY - y) / static_cast<float>(SCREENHEIGHT), 0.0);
+        camera.move((x - lastX) / static_cast<float>(SCREENWIDTH), (lastY - y) / static_cast<float>(SCREENHEIGHT),
+                    0.0);
         lastX = x;
         lastY = y;
     } else if (mouseZoomPressed == true) {
@@ -257,6 +404,8 @@ int main(int argc, char **argv) {
     glutMouseFunc(mouse);
     key('?', 0, 0);
 
+    setupControlPoints();
+    setupMiddleConstructionPoints();
     setupCurvePoints();
 
     glutMainLoop();

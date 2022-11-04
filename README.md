@@ -1,4 +1,4 @@
-# HAI702I_tp
+# Parametric curves - Practical Exercices
 Code derived from GMINI
 -----------
 
@@ -7,10 +7,7 @@ Author: Tamy Boubekeur (https://perso.telecom-paristech.fr/boubek/)
 
 Description
 ------------
-
-gmini is a small 3D "tester" program, with minimum interaction. 
-Just replace the loading and/or drawing function for testing your algorithm, or visualize your particular format.
-
+Practical exercices about parametric curves.
 
 Compilation 
 ------------
